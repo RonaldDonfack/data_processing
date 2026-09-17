@@ -1,1 +1,3 @@
-"# data_processing" 
+- Group gr-03
+- project/lab member 1, git username : RonaldDonfack
+- project/lab member 2, git username : Dan-Waintraub
