@@ -1,2 +1,8 @@
-yellow_tripdata_2025-01.parquet
-yellow_tripdata_2019-01.parquet
+# Parquet datasets
+*.parquet
+
+# Jupyter temporary files
+.ipynb_checkpoints/
+
+# Spark warehouse
+spark-warehouse/
