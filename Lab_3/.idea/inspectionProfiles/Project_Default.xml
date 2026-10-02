@@ -1,0 +1,128 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="aiohappyeyeballs" />
+          <option value="aiohttp" />
+          <option value="aiosignal" />
+          <option value="annotated-types" />
+          <option value="anyio" />
+          <option value="asyncpg" />
+          <option value="attrs" />
+          <option value="beautifulsoup4" />
+          <option value="bs4" />
+          <option value="certifi" />
+          <option value="cffi" />
+          <option value="charset-normalizer" />
+          <option value="colorama" />
+          <option value="dataclasses-json" />
+          <option value="filelock" />
+          <option value="frozenlist" />
+          <option value="fsspec" />
+          <option value="greenlet" />
+          <option value="h11" />
+          <option value="httpcore" />
+          <option value="httpx" />
+          <option value="httpx-sse" />
+          <option value="huggingface-hub" />
+          <option value="idna" />
+          <option value="Jinja2" />
+          <option value="joblib" />
+          <option value="jsonpatch" />
+          <option value="jsonpointer" />
+          <option value="langchain" />
+          <option value="langchain-classic" />
+          <option value="langchain-community" />
+          <option value="langchain-core" />
+          <option value="langchain-huggingface" />
+          <option value="langchain-postgres" />
+          <option value="langchain-text-splitters" />
+          <option value="langgraph" />
+          <option value="langgraph-checkpoint" />
+          <option value="langgraph-prebuilt" />
+          <option value="langgraph-sdk" />
+          <option value="langsmith" />
+          <option value="MarkupSafe" />
+          <option value="marshmallow" />
+          <option value="mpmath" />
+          <option value="multidict" />
+          <option value="mypy_extensions" />
+          <option value="networkx" />
+          <option value="numpy" />
+          <option value="orjson" />
+          <option value="ormsgpack" />
+          <option value="outcome" />
+          <option value="packaging" />
+          <option value="pgvector" />
+          <option value="pillow" />
+          <option value="propcache" />
+          <option value="psycopg" />
+          <option value="psycopg-binary" />
+          <option value="psycopg-pool" />
+          <option value="pycparser" />
+          <option value="pydantic" />
+          <option value="pydantic-settings" />
+          <option value="pydantic_core" />
+          <option value="PySocks" />
+          <option value="python-dotenv" />
+          <option value="PyYAML" />
+          <option value="regex" />
+          <option value="requests" />
+          <option value="requests-toolbelt" />
+          <option value="safetensors" />
+          <option value="scikit-learn" />
+          <option value="scipy" />
+          <option value="selenium" />
+          <option value="sentence-transformers" />
+          <option value="setuptools" />
+          <option value="sniffio" />
+          <option value="sortedcontainers" />
+          <option value="soupsieve" />
+          <option value="SQLAlchemy" />
+          <option value="sympy" />
+          <option value="tenacity" />
+          <option value="threadpoolctl" />
+          <option value="tokenizers" />
+          <option value="torch" />
+          <option value="torchvision" />
+          <option value="tqdm" />
+          <option value="transformers" />
+          <option value="trio" />
+          <option value="trio-websocket" />
+          <option value="typing-inspect" />
+          <option value="typing-inspection" />
+          <option value="typing_extensions" />
+          <option value="urllib3" />
+          <option value="uuid_utils" />
+          <option value="webdriver-manager" />
+          <option value="websocket-client" />
+          <option value="wsproto" />
+          <option value="xxhash" />
+          <option value="yarl" />
+          <option value="zstandard" />
+          <option value="psycopg2" />
+          <option value="tzdata" />
+          <option value="appnope" />
+          <option value="iniconfig" />
+          <option value="pbr" />
+          <option value="pexpect" />
+          <option value="pluggy" />
+          <option value="ptyprocess" />
+          <option value="pytest" />
+          <option value="symengine" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyStubPackagesAdvertiser" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="pandas" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnboundLocalVariableInspection" enabled="false" level="WARNING" enabled_by_default="false" />
+  </profile>
+</component>
