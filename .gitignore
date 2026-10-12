@@ -5,4 +5,5 @@
 .ipynb_checkpoints/
 
 # Spark warehouse
-spark-warehouse/
+spark-warehouse/yellow_tripdata_2019-01.parquet
+yellow_tripdata_2025-01.parquet
