@@ -1,5 +1,7 @@
 """Refresh measured tables in REPORT.md, preserving team-written text."""
 import argparse
+import csv
+import gzip
 import json
 from pathlib import Path
 
@@ -32,13 +34,23 @@ def render(root, report):
     datasets = sorted(p for p in (root/"results").glob("*") if (p/"_SUCCESS").exists())
     if not datasets:
         raise ValueError("No successful result datasets")
+    exports = report.parent / "Project" / "results"
+    exports.mkdir(parents=True, exist_ok=True)
     for p in datasets:
         df = spark.read.parquet(str(p))
         total = df.count()
         columns = ORDER.get(p.name,df.columns[:2])
         order = [F.desc(c[1:]) if c.startswith("-") else F.asc(c) for c in columns]
         limit = total if total <= 150 else 15
-        lines.extend([f"### {p.name}", "", f"{total:,} rows. Full output: `work/results/{p.name}/` (Parquet).", ""])
+        archive = exports / (p.name + ".csv.gz")
+        temp = archive.with_suffix(".tmp")
+        with gzip.open(temp, "wt", encoding="utf-8", newline="") as data:
+            writer = csv.writer(data)
+            writer.writerow(df.columns)
+            for row in df.toLocalIterator():
+                writer.writerow(json.dumps(v, ensure_ascii=False) if isinstance(v, (list,dict)) else v for v in row)
+        temp.replace(archive)
+        lines.extend([f"### {p.name}", "", f"{total:,} rows. [Complete CSV](Project/results/{archive.name}).", ""])
         lines.extend(table(df.columns, df.orderBy(*order).limit(limit).collect()))
         lines.append("")
     progress = root / "live/progress.jsonl"
