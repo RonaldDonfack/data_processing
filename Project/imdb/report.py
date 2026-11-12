@@ -28,6 +28,16 @@ def table(cols, rows):
             *["| " + " | ".join(map(cell, row)) + " |" for row in rows]]
 
 
+def export_csv(df, archive):
+    temp = archive.with_suffix(".tmp")
+    with gzip.open(temp, "wt", encoding="utf-8", newline="") as data:
+        writer = csv.writer(data)
+        writer.writerow(df.columns)
+        for row in df.toLocalIterator():
+            writer.writerow(json.dumps(v, ensure_ascii=False) if isinstance(v, (list,dict)) else v for v in row)
+    temp.replace(archive)
+
+
 def render(root, report):
     spark = session()
     lines = []
@@ -43,16 +53,26 @@ def render(root, report):
         order = [F.desc(c[1:]) if c.startswith("-") else F.asc(c) for c in columns]
         limit = total if total <= 150 else 15
         archive = exports / (p.name + ".csv.gz")
-        temp = archive.with_suffix(".tmp")
-        with gzip.open(temp, "wt", encoding="utf-8", newline="") as data:
-            writer = csv.writer(data)
-            writer.writerow(df.columns)
-            for row in df.toLocalIterator():
-                writer.writerow(json.dumps(v, ensure_ascii=False) if isinstance(v, (list,dict)) else v for v in row)
-        temp.replace(archive)
+        export_csv(df, archive)
         lines.extend([f"### {p.name}", "", f"{total:,} rows. [Complete CSV](Project/results/{archive.name}).", ""])
         lines.extend(table(df.columns, df.orderBy(*order).limit(limit).collect()))
         lines.append("")
+    enrichment = {
+        "documents": ["imdb_id","source_url","status","text"],
+        "films": ["tconst","startYear","genre","position","primaryTitle","averageRating","numVotes","status"],
+        "people": ["tconst","nconst","position","status"],
+        "languages": ["tconst","language","entity","lookup_url"],
+    }
+    enriched_rows = []
+    for name, columns in enrichment.items():
+        path = root / "enriched" / name
+        if (path / "_SUCCESS").exists():
+            df = spark.read.parquet(str(path)).select(*columns)
+            archive = exports / ("enriched_" + name + ".csv.gz")
+            export_csv(df,archive)
+            enriched_rows.append((name,df.count(),f"[Complete CSV](Project/results/{archive.name})"))
+    if enriched_rows:
+        lines += ["### Enrichment files", ""] + table(["Dataset","Rows","Download"],enriched_rows) + [""]
     progress = root / "live/progress.jsonl"
     if progress.exists():
         rows = [json.loads(line) for line in progress.read_text().splitlines()]
