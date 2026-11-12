@@ -7,6 +7,7 @@ from enrich import targets
 from explore import QUERIES, views
 from open_question import QUERY
 from prepare import TABLES, prepare, session
+from report import END, START, render
 
 
 def fixture(root):
@@ -60,4 +61,18 @@ if __name__ == "__main__":
         films, people = targets(spark)
         assert films.count()==15 and people.count()==30
         assert spark.sql(QUERY).count()==0
+        # Two distinct first casts in year one, then both actors return.
+        spark.createDataFrame([("nm1","a"),("nm1","b"),("nm1","c"),("nm1","d")],
+                              "nconst string,tconst string").createOrReplaceTempView("directed")
+        spark.createDataFrame([("nm2","a"),("nm3","b"),("nm2","c"),("nm3","d")],
+                              "nconst string,tconst string").createOrReplaceTempView("cast_movies")
+        spark.createDataFrame([("a",2000,5.0),("b",2000,6.0),("c",2001,7.0),("d",2001,8.0)],
+                              "tconst string,startYear int,averageRating double").createOrReplaceTempView("movies")
+        assert spark.sql(QUERY).first().difference==2.0
+        report = root / "REPORT.md"
+        report.write_text("Student text.\n"+START+"\n"+END)
+        render(root,report)
+        assert report.read_text().startswith("Student text.")
+        with gzip.open(root/"Project/results/top_missing.csv.gz","rt") as data:
+            assert len(data.readlines())==6
     print("Passed: raw cleaning, all exploration queries, ranking targets, open question.")
