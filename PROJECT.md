@@ -86,7 +86,7 @@ The producer sends Wikipedia main-namespace edits and new pages from all Wikiped
 "${spark[@]}" Project/imdb/report.py
 ```
 
-The renderer replaces only the measured-output block in `REPORT.md`. Small results appear in full, larger results include an ordered preview and the location of the complete Parquet dataset. To inspect any full result interactively, start `pyspark` and use `spark.read.parquet("work/results/directors").show(100, truncate=False)`. Work files, source dumps, caches and checkpoints belong outside version control.
+The renderer replaces only the measured-output block in `REPORT.md`. Small results appear in full. Larger tables include an ordered preview. Each table links to a complete compressed CSV in `Project/results/`. To inspect any full result interactively, start `pyspark` and use `spark.read.parquet("work/results/directors").show(100, truncate=False)`. Work files, source dumps, caches and checkpoints belong outside version control.
 
 ## Development and submission
 
