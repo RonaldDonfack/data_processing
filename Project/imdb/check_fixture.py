@@ -24,6 +24,9 @@ def fixture(root):
         data["crew"].append((film,"nm1,nm99" if i==0 else "nm1","nm1"))
         data["principals"].extend([(film,1,"nm2","actor",None,None),(film,2,"nm1","director",None,None)])
     data["principals"].append(("tt9999",1,"nm2","actor",None,None))
+    # Rated 10/10 by five voters: must not enter the enrichment top 10.
+    data["titles"].append(("tt099","movie","Obscure","Obscure",0,2000,None,90,"Drama"))
+    data["ratings"].append(("tt099",10,5))
     data["akas"].append(("tt000",1,"Film zéro","FR","fr",None,None,0))
     data["titles"].append(("ttSeries","tvSeries","A Series","A Series",0,1990,None,None,"Drama"))
     for season in range(1,4):
@@ -72,6 +75,7 @@ if __name__ == "__main__":
         views(spark,root)
         films, people = targets(spark)
         assert films.count()==15 and people.count()==30
+        assert films.where("tconst='tt099'").count()==0
         assert spark.sql(QUERY).count()==0
         # Two distinct first casts in year one, then both actors return.
         spark.createDataFrame([("nm1","a"),("nm1","b"),("nm1","c"),("nm1","d")],

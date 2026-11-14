@@ -165,10 +165,19 @@ def collect(ids, service, target, include_text):
     temp.replace(target)
 
 
+# Ranking on averageRating alone lets films rated 10/10 by a handful of voters fill
+# the top 10 of most (year, genre) groups. Such films rarely have a Wikipedia page,
+# which defeats the brief's expectation that most enriched records are available.
+# Requiring the same vote floor used for "successful" films elsewhere makes the
+# ranking reflect films with a meaningful audience.
+MIN_VOTES = 1000
+
+
 def targets(spark):
-    films = spark.sql("""SELECT * FROM (SELECT startYear,genre,tconst,primaryTitle,averageRating,numVotes,
+    films = spark.sql(f"""SELECT * FROM (SELECT startYear,genre,tconst,primaryTitle,averageRating,numVotes,
         row_number() OVER(PARTITION BY startYear,genre ORDER BY averageRating DESC,numVotes DESC,tconst) position
-        FROM film_genres WHERE startYear BETWEEN 1980 AND 2025 AND averageRating IS NOT NULL) WHERE position<=10""")
+        FROM film_genres WHERE startYear BETWEEN 1980 AND 2025 AND averageRating IS NOT NULL
+        AND numVotes >= {MIN_VOTES}) WHERE position<=10""")
     credits = spark.table("principals").join(films.select("tconst").distinct(), "tconst")
     ordered = Window.partitionBy("tconst").orderBy("ordering", "nconst")
     people = (credits.groupBy("tconst", "nconst").agg(F.min("ordering").alias("ordering"))
