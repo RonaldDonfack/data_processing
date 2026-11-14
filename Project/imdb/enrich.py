@@ -10,7 +10,6 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import requests
-from bs4 import BeautifulSoup
 from pyspark.sql import Window, functions as F
 
 from explore import views
@@ -19,7 +18,7 @@ from prepare import save, session
 WD = "https://query.wikidata.org/sparql"
 WP = "https://en.wikipedia.org/w/api.php"
 FACT_SCHEMA = "imdb_id string, entity string, article string, languages array<string>, lookup_url string"
-TEXT_SCHEMA = "imdb_id string, text string, source_url string, status string"
+TEXT_SCHEMA = "imdb_id string, wikitext string, source_url string, status string"
 
 
 class Wikimedia:
@@ -89,31 +88,70 @@ class Wikimedia:
                 self.put("id:" + i, rec)
         return [self.cached("id:" + i) for i in ids]
 
-    def article(self, fact):
+    def articles(self, facts):
         from urllib.parse import unquote
-        i = fact["imdb_id"]
-        cached = self.cached("text:" + i)
-        if cached is not None:
-            return cached
-        rec = dict(imdb_id=i, text=None, source_url=fact["entity"] or fact["lookup_url"], status="no_enwiki_page")
-        if fact["article"]:
+        from collections import defaultdict
+        by_title = defaultdict(list)
+        for fact in facts:
+            key = "revision:" + fact["imdb_id"]
+            if self.cached(key) is not None:
+                continue
+            rec = dict(imdb_id=fact["imdb_id"], wikitext=None, source_url=fact["entity"] or fact["lookup_url"],
+                       status="no_enwiki_page")
+            if not fact["article"]:
+                self.put(key, rec)
+                continue
             title = unquote(fact["article"].split("/wiki/", 1)[1]).replace("_", " ")
-            params = dict(action="parse", page=title, prop="sections|revid", redirects=1, format="json", maxlag=5)
-            page = self.query(WP, params)["parse"]
-            rev = page["revid"]
-            rec.update(source_url=f"https://en.wikipedia.org/w/index.php?oldid={rev}", status="section_unavailable")
-            section = "0" if i.startswith("nm") else next((s["index"] for s in page["sections"]
-                if s["line"].strip().lower() in {"plot", "plot synopsis", "synopsis", "plot summary", "premise"}), None)
-            if section is not None:
-                body = self.query(WP, dict(action="parse", oldid=rev, section=section, prop="text", format="json", maxlag=5))
-                soup = BeautifulSoup(body["parse"]["text"]["*"], "html.parser")
-                for tag in soup.select("table, sup, style, .hatnote, .navbox"):
-                    tag.decompose()
-                words = [p.get_text(" ", strip=True) for p in soup.select("p")]
-                rec["text"] = "\n".join(w for w in words if w) or None
-                rec["status"] = "available" if rec["text"] else "empty_section"
-        self.put("text:" + i, rec)
-        return rec
+            by_title[title].append(rec)
+        titles = iter(by_title)
+        while batch := list(itertools.islice(titles, 35)):
+            params = dict(action="query", prop="revisions", titles="|".join(batch), rvprop="ids|content",
+                          rvslots="main", redirects=1, format="json", formatversion=2, maxlag=5)
+            redirects, pages = {}, {}
+            while True:
+                reply = self.query(WP, params)
+                result = reply["query"]
+                redirects.update({v["from"]: v["to"] for group in ("normalized", "redirects")
+                                  for v in result.get(group, [])})
+                pages.update({p["title"]: p for p in result["pages"] if p.get("revisions")})
+                if "continue" not in reply:
+                    break
+                params.update(reply["continue"])
+            for title in batch:
+                target = title
+                visited = set()
+                while target in redirects and target not in visited:
+                    visited.add(target)
+                    target = redirects[target]
+                page = pages.get(target, {})
+                for rec in by_title[title]:
+                    if page.get("revisions"):
+                        rev = page["revisions"][0]
+                        source = rev["slots"]["main"].get("content", "")
+                        rec.update(wikitext=source, source_url=f"https://en.wikipedia.org/w/index.php?oldid={rev['revid']}",
+                                   status="revision_retrieved")
+                    self.put("revision:" + rec["imdb_id"], rec)
+        return [self.cached("revision:" + f["imdb_id"]) for f in facts]
+
+
+def extract_section(imdb_id, source, retrieval_status):
+    import mwparserfromhell
+    if not source:
+        return (None, retrieval_status if retrieval_status != "revision_retrieved" else "empty_revision")
+    doc = mwparserfromhell.parse(source)
+    if imdb_id.startswith("nm"):
+        sections = doc.get_sections(include_headings=False, include_lead=True, flat=True)[:1]
+    else:
+        sections = doc.get_sections(matches=r"(?i)^\s*(plot|plot summary|plot synopsis|synopsis|premise)\s*$",
+                                    include_headings=False)[:1]
+    if not sections:
+        return (None, "section_unavailable")
+    section = sections[0]
+    for tag in section.filter_tags(recursive=False):
+        if str(tag.tag).lower() in {"ref", "table", "gallery", "math"}:
+            section.remove(tag)
+    text = section.strip_code(normalize=True, collapse=True, keep_template_params=False).strip()
+    return (text or None, "available" if text else "empty_section")
 
 
 def collect(ids, service, target, include_text):
@@ -121,8 +159,8 @@ def collect(ids, service, target, include_text):
     temp = target.with_suffix(".tmp")
     with temp.open("w", encoding="utf-8") as out:
         while batch := list(itertools.islice(iterator, 35)):
-            for fact in service.facts(batch):
-                record = service.article(fact) if include_text else fact
+            facts = service.facts(batch)
+            for record in service.articles(facts) if include_text else facts:
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
     temp.replace(target)
 
@@ -158,7 +196,12 @@ if __name__ == "__main__":
         films, people = targets(spark)
         path = root / "wiki-text.jsonl"
         collect(films.select("tconst").union(people.select("nconst")), api, path, True)
-        docs = spark.read.schema(TEXT_SCHEMA).json(str(path))
+        extract = F.udf(extract_section, "text string, status string")
+        docs = (spark.read.schema(TEXT_SCHEMA).json(str(path))
+                .select("imdb_id", "source_url", extract("imdb_id","wikitext","status").alias("section"))
+                .select("imdb_id","source_url","section.*"))
+        save(docs, root / "enriched/documents")
+        docs = spark.read.parquet(str(root / "enriched/documents"))
         save(films.join(docs.withColumnRenamed("imdb_id", "tconst"), "tconst"), root / "enriched/films")
         save(people.join(docs.withColumnRenamed("imdb_id", "nconst"), "nconst"), root / "enriched/people")
         coverage = films.select("tconst").distinct().join(people.groupBy("tconst").count(), "tconst", "left").fillna(0)

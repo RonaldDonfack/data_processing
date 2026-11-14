@@ -46,10 +46,10 @@ QUERIES = {
         max(CASE WHEN seasonNumber<=2 THEN averageRating END) early_high FROM ep JOIN series USING(parentTconst)
         GROUP BY 1,2) SELECT ranked.*,t.primaryTitle FROM ranked JOIN titles t ON t.tconst=parentTconst
         WHERE worst=final_low AND best=early_high AND best>worst AND titleType='tvSeries'""",
-    "languages": """WITH l AS (SELECT DISTINCT c.nconst,x.language FROM cast_movies c JOIN languages_source x
+    "languages": """WITH l AS (SELECT DISTINCT c.nconst,c.tconst,x.language FROM cast_movies c JOIN languages_source x
         USING(tconst) JOIN ratings r USING(tconst) WHERE r.averageRating>=7 AND r.numVotes>=1000 AND x.language IS NOT NULL)
-        SELECT nconst,primaryName,sort_array(collect_set(language)) languages,count(*) language_count
-        FROM l JOIN names USING(nconst) GROUP BY nconst,primaryName HAVING count(*)>=2""",
+        SELECT nconst,primaryName,sort_array(collect_set(language)) languages,count(DISTINCT language) language_count,count(DISTINCT tconst) successful_films
+        FROM l JOIN names USING(nconst) GROUP BY nconst,primaryName HAVING language_count>=2 AND successful_films>=2""",
     "early_peaks": """WITH careers AS (SELECT nconst,min(startYear) debut,max(startYear) latest,count(*) films
         FROM cast_movies WHERE startYear IS NOT NULL GROUP BY 1 HAVING latest-debut>=20 AND films>=15),
         split AS (SELECT *,startYear<=debut+(latest-debut)/3 early FROM careers JOIN cast_movies USING(nconst)),

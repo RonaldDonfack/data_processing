@@ -7,3 +7,9 @@
 # Spark warehouse
 spark-warehouse/yellow_tripdata_2019-01.parquet
 yellow_tripdata_2025-01.parquet
+
+# Local IMDb inputs, Spark state and Python environment
+/work/
+/.venv/
+/artifacts/
+__pycache__/
