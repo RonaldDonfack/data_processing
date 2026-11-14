@@ -21,7 +21,7 @@ def fixture(root):
         film = f"tt{i:03}"
         data["titles"].append((film,"movie",f"Movie {i}",f"Movie {i}",0,1980+i*2,None,250 if i==0 else 90,"Drama"))
         data["ratings"].append((film,9 if i==0 else 7 if i in (1,2) else 5,2000))
-        data["crew"].append((film,"nm1","nm1"))
+        data["crew"].append((film,"nm1,nm99" if i==0 else "nm1","nm1"))
         data["principals"].extend([(film,1,"nm2","actor",None,None),(film,2,"nm1","director",None,None)])
     data["principals"].append(("tt9999",1,"nm2","actor",None,None))
     data["akas"].append(("tt000",1,"Film zéro","FR","fr",None,None,0))
@@ -49,6 +49,11 @@ if __name__ == "__main__":
         views(spark,root)
         assert spark.table("principals").count()==30
         assert spark.table("names").where("nconst='nm3'").first().deathYear is None
+        # nm99 is not in name.basics: it is removed from the list and reported.
+        assert spark.table("crew").where("tconst='tt000'").first().directors=="nm1"
+        quality = {r.issue: r.affected for r in spark.read.parquet(str(root/"results/quality"))
+                   .where("dataset='crew'").collect()}
+        assert quality["unknown person in directors removed"]==1
         spark.createDataFrame([("tt000","English"),("tt001","French"),("tt002","German")],
                               "tconst string,language string").createOrReplaceTempView("languages_source")
         for name,sql in QUERIES.items():
