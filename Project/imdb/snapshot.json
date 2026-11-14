@@ -1,0 +1,37 @@
+[
+  {
+    "file": "title.basics.tsv.gz",
+    "url": "https://datasets.imdbws.com/title.basics.tsv.gz",
+    "sha256": "0c79f4e44df509b6cc05d614acc4d243bd8864c81d01920beaf219af21703e9c"
+  },
+  {
+    "file": "name.basics.tsv.gz",
+    "url": "https://datasets.imdbws.com/name.basics.tsv.gz",
+    "sha256": "f336995c5441d63f6fb39318539dbac8afe9a54438c2308609a3b34bb63f1744"
+  },
+  {
+    "file": "title.akas.tsv.gz",
+    "url": "https://datasets.imdbws.com/title.akas.tsv.gz",
+    "sha256": "ac8e630d91a55e9b25277a8d2616bef32f034c81e738a0e044423c4b17343f34"
+  },
+  {
+    "file": "title.crew.tsv.gz",
+    "url": "https://datasets.imdbws.com/title.crew.tsv.gz",
+    "sha256": "42b5514dd86c539a86da226dee21a8f258eea0b21124ac7936997bb3b00eca79"
+  },
+  {
+    "file": "title.episode.tsv.gz",
+    "url": "https://datasets.imdbws.com/title.episode.tsv.gz",
+    "sha256": "4f4407887d5f110fd19da549885ce0cd8528c1e5e2ed5c3fca065f67af3666bc"
+  },
+  {
+    "file": "title.principals.tsv.gz",
+    "url": "https://datasets.imdbws.com/title.principals.tsv.gz",
+    "sha256": "34c4bb856cfec5773df1bc2ebbbf55f349a3f774a46928aa8ea13cebaefb9f8f"
+  },
+  {
+    "file": "title.ratings.tsv.gz",
+    "url": "https://datasets.imdbws.com/title.ratings.tsv.gz",
+    "sha256": "26fb6829b012e0f93e7a5e5ee1330effcf4e06a00b104a208bee5c382933914d"
+  }
+]

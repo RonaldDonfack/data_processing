@@ -1,5 +1,6 @@
 """Download the seven IMDb tables, audit raw cells and produce typed Parquet."""
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -56,8 +57,13 @@ def register(spark, root):
 def prepare(spark, root):
     profile, issues = [], []
     for name, (stem, columns) in TABLES.items():
+        # Gzip streams are unsplittable. Expand one table at a time so Spark can
+        # parallelize input splits without holding the full TSV in memory.
+        tsv = root / "raw" / (stem + ".tsv")
+        with gzip.open(root / "raw" / (stem + ".tsv.gz"), "rb") as src, tsv.open("wb") as dst:
+            shutil.copyfileobj(src, dst, length=1024 * 1024)
         df = (spark.read.option("header", True).option("sep", "\t").option("quote", "")
-              .option("mode", "FAILFAST").csv(str(root / "raw" / (stem + ".tsv.gz"))))
+              .option("mode", "FAILFAST").csv(str(tsv)))
         if df.columns != columns.split():
             raise ValueError(f"Unexpected header for {stem}: {df.columns}")
         df = df.select(*(F.when(~F.trim(F.col(c)).isin("", r"\N"), F.trim(F.col(c))).alias(c) for c in df.columns))
@@ -93,6 +99,7 @@ def prepare(spark, root):
         save(df, root / "clean" / name)
         raw_cache.unpersist()
         repeated.unpersist()
+        tsv.unlink()
     audit = spark.createDataFrame(profile, "dataset string, field string, rows long, missing long, percent double")
     save(audit, root / "results/missing")
     save(audit.orderBy(F.desc("percent"), "dataset", "field").limit(5), root / "results/top_missing")

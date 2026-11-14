@@ -108,6 +108,7 @@ def consume(args):
     files = list((live / "matches").glob("*.parquet"))
     if files:
         df = spark.read.parquet(str(live / "matches"))
+        save(df.select("event_id","event_time","wiki","title","imdb_id","source_url"), args.root / "results/live_events")
         save(df.groupBy("wiki").agg(F.count("*").alias("events"),F.countDistinct("imdb_id").alias("entities"),
              F.min("event_time").alias("first_event"),F.max("event_time").alias("last_event")), args.root / "results/live_matches")
     else:
