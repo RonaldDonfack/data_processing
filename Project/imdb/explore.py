@@ -66,6 +66,18 @@ QUERIES = {
         avg(CASE WHEN roles_on_film=1 THEN averageRating END) single_mean
         FROM credits JOIN movies USING(tconst) JOIN names USING(nconst) GROUP BY 1,2""",
 }
+# multi_talented gives one row per person but does not answer the question
+# "how do they perform when holding several roles on the same film?". This summary
+# is a paired comparison: each person is compared with themselves (multi-role mean
+# minus single-role mean), which cancels out individual talent, unlike comparing
+# the average of two different groups of people. Only people rated in both
+# situations are paired.
+QUERIES["multi_talented_summary"] = f"""WITH per_person AS ({QUERIES["multi_talented"]})
+    SELECT count(*) paired_people, avg(multi_mean) multi_role_mean, avg(single_mean) single_role_mean,
+    avg(multi_mean-single_mean) mean_paired_difference,
+    percentile_approx(multi_mean-single_mean, 0.5) median_paired_difference,
+    count_if(multi_mean>single_mean)/nullif(count(*),0) share_better_when_multi
+    FROM per_person WHERE multi_mean IS NOT NULL AND single_mean IS NOT NULL"""
 
 
 def views(spark, root):

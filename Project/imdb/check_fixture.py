@@ -58,6 +58,13 @@ if __name__ == "__main__":
                 assert rows[0].language_count==3
             if name=="runtime_outliers":
                 assert [r.tconst for r in rows]==["tt000"]
+        # nm1 directs and writes tt000 (rated 9) but only directs tt003 (rated 5):
+        # one paired person, multi-role mean 9, single-role mean 5, difference +4.
+        spark.createDataFrame([("tt000","nm1","director"),("tt000","nm1","writer"),("tt003","nm1","director")],
+                              "tconst string,nconst string,role string").createOrReplaceTempView("roles")
+        summary = spark.sql(QUERIES["multi_talented_summary"]).first()
+        assert summary.paired_people==1 and summary.mean_paired_difference==4.0
+        views(spark,root)
         films, people = targets(spark)
         assert films.count()==15 and people.count()==30
         assert spark.sql(QUERY).count()==0
