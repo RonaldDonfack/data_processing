@@ -4,35 +4,188 @@
 
 ### Methodological explanation
 
-<!-- Group authors: document your method, rationale, alternatives and trade-offs. -->
+The project processes seven IMDb datasets covering titles, people, alternative titles, crew members, episodes, principal credits and ratings. These tables are connected through IMDb identifiers, principally `tconst` for titles and `nconst` for people.
+
+The preparation pipeline downloads the compressed TSV files and records their SHA-256 checksums. These checksums identify the files used during processing and support verification when reproducing an analysis. Each archive is temporarily decompressed before Spark reads it, allowing the input to be split across processing tasks. Cleaned datasets are saved in Parquet format for subsequent analysis.
+
+Missingness is measured before cleaning to preserve an accurate description of the source data. Empty strings, whitespace-only values and IMDb’s `\N` marker are treated as missing. For each column, the missing percentage is calculated as
+
+$$
+\text{Missing percentage}
+=
+\frac{\text{Number of missing values}}{\text{Total number of rows}}
+\times 100.
+$$
+
+The five columns with the highest percentages are selected across all seven datasets.
+
+Numerical fields are converted to appropriate types. Values that cannot be converted become null and are counted separately as quality issues. Records with missing primary keys are excluded. When several records share the same primary key, all records in that group are excluded because the implementation has no authoritative rule for selecting one.
+
+Additional checks address inconsistent dates, invalid runtimes, invalid ratings and broken relationships. A death year preceding a birth year is set to null. A title’s end year preceding its start year and a non-positive runtime are also set to null. Ratings must be between 1 and 10 and have at least one vote. Dependent records are checked against their parent tables, and unknown person identifiers are removed from director and writer lists.
+
+The approach preserves usable attributes while removing relationships that cannot be resolved. However, excluding duplicate-key groups can discard valid information alongside conflicting records. Alternatives include retaining flagged records for manual review or selecting a record using an explicit priority rule. Imputation is another possibility for some attributes, although imputing years, runtimes or ratings could influence the analytical results.
+
+Missingness also requires contextual interpretation. For example, an absent death year can be expected for a living person. A high missing percentage therefore does not automatically establish poor data quality.
+
 
 ## Exploration
 
 ### Methodological explanation
 
-<!-- Group authors: explain your definitions, comparisons, assumptions and alternatives. -->
+The exploration stage uses Spark SQL to join the cleaned datasets, calculate aggregates and apply ranking functions. The analyses use explicit operational definitions for terms such as popularity, success and early career. These definitions make the queries reproducible, while also determining which records qualify.
+
+#### Unusual movie runtimes
+
+The runtime analysis selects titles classified as movies with a runtime of at least 40 minutes. Films with multiple genres contribute to each listed genre. Within each genre, the query calculates the mean runtime and population standard deviation.
+
+A movie–genre pair is selected when
+
+$$
+|x-\mu_g| > 2\sigma_g,
+$$
+
+where $x$ is the film’s runtime and $\mu_g$ and $\sigma_g$ are its genre’s mean and standard deviation.
+
+This rule adjusts the threshold to the runtime distribution of each genre. Its limitation is sensitivity to extreme values, which can increase both the mean and standard deviation. An interquartile-range rule or median absolute deviation would provide alternative measures with greater resistance to extreme observations. The two-standard-deviation rule is a descriptive threshold and does not establish statistical significance.
+
+#### Annual genre popularity
+
+For movies released between 1980 and 2025, popularity is measured using the sum of IMDb votes received by films in each genre. Genres are ranked within each release year, with alphabetical ordering resolving equal vote totals.
+
+The analysis also compares the combined vote totals of the three leading genres with those of all remaining genres. Their share is calculated as
+
+$$
+\text{Top-three share}
+=
+\frac{\text{Votes assigned to the top three genres}}
+{\text{Votes assigned to all genres}}.
+$$
+
+Multi-genre films contribute their votes to multiple genre totals. Consequently, this share describes the distribution of votes assigned to genres. It cannot be interpreted as a share of unique viewers or unique film votes.
+
+The votes are those available in the dataset snapshot, grouped by film release year. They do not measure votes cast during each historical year. Older films have also had more time to accumulate votes. Alternative popularity measures include film counts, average votes per film or external audience figures, each addressing a different aspect of popularity.
+
+#### Directors with one highly rated film
+
+Director identifiers are expanded from the crew dataset and joined to movie ratings. A director qualifies when exactly one rated movie has a rating of at least 8.0, at least two other rated movies have ratings below 8.0, and those other movies average at most 6.0.
+
+Unrated films do not contribute to the rating calculations. The output identifies directors matching these numerical conditions, but the conditions alone cannot explain why their films received different ratings. A minimum vote threshold could improve rating stability, while excluding less widely rated films.
+
+#### Television series and episode extremes
+
+The episode analysis excludes season zero and requires at least three seasons containing ten or more episodes each. Episode ratings are then compared across the qualifying series.
+
+A series is selected when a lowest-rated episode occurs in its last recorded season and a highest-rated episode occurs within its first two seasons. Equal ratings are permitted, so the best or worst rating may also occur elsewhere. Series with identical best and worst ratings are excluded.
+
+The last season is the highest season number in the available data. For an ongoing series, this season may be incomplete. Episodes without ratings contribute to season-size counts but cannot determine rating extremes. Comparing season averages would provide a broader assessment of consistency, although it would address a different question from identifying individual best and worst episodes.
+
+#### Actors successful across languages
+
+Actor and actress credits are joined to movies, ratings and original-language statements retrieved from Wikidata. A successful film is defined as having a rating of at least 7.0 and at least 1,000 votes.
+
+The query selects performers with at least two successful films and at least two distinct associated languages. A separate output contains those associated with three or more languages. Multilingual films can contribute several languages.
+
+The vote threshold reduces reliance on ratings based on very small audiences, but it can exclude successful films with limited IMDb participation. Missing Wikidata language statements also reduce coverage. These results describe the languages associated with credited films and do not establish which language a performer personally speaks in a particular scene.
+
+#### Early-career rating peaks
+
+The career analysis requires at least fifteen credited movies with known release years and a recorded career spanning twenty years or more. The early-career period is defined as the first third of the interval between the earliest and latest recorded film years.
+
+A performer qualifies when both the highest rating and mean rating in the early period exceed their corresponding values in the later period. Using both comparisons reduces dependence on a single highly rated early film.
+
+Alternative definitions include the first five films or the first ten career years. Each would produce a different grouping. The current approach also depends on the completeness of IMDb principal credits and uses film ratings as a proxy for career success.
+
+#### Professionals holding multiple roles
+
+Director, writer and actor credits are combined to identify professionals with at least two distinct roles across movies. Their films are divided according to whether they hold one or several of these roles on the same project.
+
+The analysis reports film counts and average ratings for each situation. A paired summary includes professionals with available ratings in both groups and calculates their individual rating differences before aggregating them.
+
+Comparing each person with themselves reduces differences arising from the composition of separate groups. However, budgets, genres, career stage and project selection can still influence the observed differences. The analysis therefore supports descriptive comparisons rather than causal conclusions.
 
 ## Enrichment
 
 ### Methodological explanation
 
-<!-- Group authors: discuss coverage, provenance, language and source limitations. -->
+The enrichment pipeline selects feature-length movies released between 1980 and 2025 and ranks them within each year and genre. The current implementation requires at least 1,000 votes and orders eligible films by descending average rating, descending vote count and IMDb identifier. It retains up to ten films per group.
+
+The vote threshold limits the influence of exceptionally high ratings based on a small number of votes. It also narrows the eligible population and can leave some year–genre groups with fewer than ten films. This additional restriction must be disclosed when assessing coverage against the assignment.
+
+For each selected film, the pipeline chooses up to three distinct principals in credit order. Selecting three principal records does not ensure that three biographies are available, so retrieval coverage must be checked separately.
+
+Wikidata’s IMDb identifier property connects films and people to their corresponding entities. Linked English Wikipedia pages supply source text. Film synopses are extracted from sections such as “Plot” or “Synopsis,” while biographical information is extracted from the introductory section of a person’s article.
+
+Collection takes place through HTTP requests. Schema enforcement, section extraction, text cleaning and joins are performed in Spark. The pipeline extracts existing source material without generating replacement synopses or biographies.
+
+Source revision URLs are retained so that extracted text can be traced to a specific article version. Missing pages, unavailable sections and empty extracts receive explicit statuses. A SQLite cache stores lookup and revision responses, allowing interrupted collection to resume without repeating successful requests.
+
+Requests are spaced apart, and the collector implements retries for selected temporary failures, rate-limit responses and server lag. Attribution and applicable Wikipedia licensing must accompany redistributed extracts.
+
+Using one source simplifies provenance and collection logic. The trade-off is incomplete coverage, especially for films or principals without suitable English Wikipedia pages. Additional language editions or open-license databases could increase coverage, at the cost of more complex matching and licensing requirements.
+
+
 
 ## Streaming
 
 ### Methodological explanation
 
-<!-- Group authors: describe matching, observed false positives, late events and the live test window. -->
+The streaming pipeline collects live Wikipedia change events, publishes them to Kafka and processes them with PySpark Structured Streaming.
+
+The producer accepts edits and new pages in Wikipedia’s main namespace across language editions. This broad intake increases opportunities to capture relevant changes during a limited observation window.
+
+Spark compares event page titles against a static lookup constructed from IMDb movie titles, television-series titles and people’s names. Labels are normalized by replacing underscores, trimming spaces and converting characters to lowercase. Selected disambiguation suffixes are removed from event titles. The lookup retains multiword labels of at least five characters that map to one IMDb identifier.
+
+These rules reduce some ambiguous matches, but a matching page title still represents a candidate association. False matches can remain, and single-word names, translated titles or alternative spellings can be missed. Identifier-based matching could improve precision but would require an additional mapping source.
+
+The consumer uses the event’s timestamp and applies a ten-minute watermark with event-ID deduplication. The watermark allows the system to bound retained state while tolerating delayed events within its configured event-time horizon. Events arriving beyond the supported horizon may be discarded, and deduplication does not provide unlimited historical protection.
+
+A longer watermark would increase tolerance for delays while retaining more state. A shorter watermark would reduce state retention while increasing exposure to late arrivals. The appropriate setting requires observation of actual event delays.
+
+Matched events are written to Parquet with event identifiers, timestamps, Wikipedia editions, page titles, IMDb identifiers and source URLs. Checkpoints retain processing progress and streaming state for recovery. Progress logs record completed batches, input counts and watermark-related metrics.
+
+**Results status.** The published report records two completed batches containing 143 Kafka input rows and zero rows dropped by the watermark. These observations establish limited processing activity. They do not document a complete 15–30-minute test, the number of relevant matches or recovery under connection interruption.
+
+The current producer handles connection errors and timeouts, but recovery from prematurely terminated chunked responses remains an implementation gap. A completed live run and validation of its matching results are still required.
 
 ## Open question
 
 ### Question and methodological explanation
 
-<!-- Group authors: state the question, motivation, data, alternatives and interpretation. -->
+**Among directors with sufficient observations, how do IMDb ratings differ between films involving previously credited actors and films without an observed earlier collaboration?**
+
+The question examines whether recurring professional relationships are associated with differences in audience ratings. It requires combining director credits, actor credits, movie release years and ratings.
+
+The analysis constructs director–actor pairs for each movie and identifies the earliest recorded release year for each pair. A collaboration is classified as repeated when the current film’s release year is later than that first year.
+
+A director’s film is classified as involving repeat collaboration if at least one credited actor previously worked with that director. The data are then reduced to one observation per director and film, preventing films with several returning actors from being counted multiple times.
+
+Directors must have at least two rated films in each comparison group. For each eligible director, the query calculates
+
+$$
+\Delta_d
+=
+\overline{R}_{d,\text{repeat}}
+-
+\overline{R}_{d,\text{first}}.
+$$
+
+A positive difference indicates a higher average rating for that director’s films involving a previously credited actor. The summary reports the number of eligible directors and the mean and median differences.
+
+A pooled comparison across all films would give greater influence to directors with larger filmographies. The implemented director-level comparison instead measures differences within each eligible director’s recorded work.
+
+Several limitations affect interpretation. Principal credits provide incomplete cast coverage. Release years cannot establish the order of films released in the same year, so those films do not establish a strictly earlier collaboration. Genre, budget, sequels, career stage and project selection may also influence ratings. Any observed association would therefore require further analysis before being attributed to the effect of repeated collaboration.
+
 
 ## Measured outputs
 
-<!-- measured-output:start -->
+The following measurements are available in the current repository. The published outputs predate some changes to preparation and enrichment, so a final execution against the current code is needed to establish a consistent submission.
+
+| Output | Published size | Description |
+| --- | --- | --- |
+| Annual genre rankings | 138 rows | Three genres for each year from 1980 to 2025 |
+| Annual genre comparison | 46 rows | Top-three vote totals compared with remaining genres |
+| Runtime outliers | 13,661 rows | Qualifying movie–genre pairs |
+| Streaming progress | 2 batches | 143 Kafka input rows and zero watermark drops |
 
 ### annual_comparison
 
