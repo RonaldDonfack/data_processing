@@ -11,10 +11,7 @@ The preparation pipeline downloads the compressed TSV files and records their SH
 Missingness is measured before cleaning to preserve an accurate description of the source data. Empty strings, whitespace-only values and IMDb’s `\N` marker are treated as missing. For each column, the missing percentage is calculated as
 
 $$
-\text{Missing percentage}
-=
-\frac{\text{Number of missing values}}{\text{Total number of rows}}
-\times 100.
+\text{Missing percentage} = \frac{\text{Number of missing values}}{\text{Total number of rows}} \times 100
 $$
 
 The five columns with the highest percentages are selected across all seven datasets.
