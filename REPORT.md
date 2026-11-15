@@ -52,10 +52,7 @@ For movies released between 1980 and 2025, popularity is measured using the sum 
 The analysis also compares the combined vote totals of the three leading genres with those of all remaining genres. Their share is calculated as
 
 $$
-\text{Top-three share}
-=
-\frac{\text{Votes assigned to the top three genres}}
-{\text{Votes assigned to all genres}}.
+\text{Top-three share} =\frac{\text{Votes assigned to the top three genres}}{\text{Votes assigned to all genres}}.
 $$
 
 Multi-genre films contribute their votes to multiple genre totals. Consequently, this share describes the distribution of votes assigned to genres. It cannot be interpreted as a share of unique viewers or unique film votes.
@@ -159,11 +156,7 @@ A director’s film is classified as involving repeat collaboration if at least 
 Directors must have at least two rated films in each comparison group. For each eligible director, the query calculates
 
 $$
-\Delta_d
-=
-\overline{R}_{d,\text{repeat}}
--
-\overline{R}_{d,\text{first}}.
+\Delta_d=\overline{R}_{d,\text{repeat}}-\overline{R}_{d,\text{first}}.
 $$
 
 A positive difference indicates a higher average rating for that director’s films involving a previously credited actor. The summary reports the number of eligible directors and the mean and median differences.
